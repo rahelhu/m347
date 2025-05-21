@@ -1,0 +1,3 @@
+FROM nginx                     # Verwendet das offizielle nginx-Image als Basis
+COPY static-html-directory /var/www/html # Kopiert lokale Dateien ins Image (veralteter Pfad!)
+EXPOSE 80                     # Öffnet Port 80 für den Webserver im Container
