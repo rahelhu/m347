@@ -1,0 +1,102 @@
+#cloud-config
+users:
+  - name: ubuntu
+    sudo: ALL=(ALL) NOPASSWD:ALL
+    groups: users, admin
+    home: /home/ubuntu
+    shell: /bin/bash
+    ssh_authorized_keys:
+      - ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQCUBo+qnNu5xxM9vfz4C04M36FHxHNrEMdm5TkFj1/SfVtqunlUOeMpu7nFCZZKnX8HYwf/MkjcBiTYAgncxku8grwl6XuW/pcvmb6/ghSIaw4xtRRSzit7omqJ5d8kXB3+Nd1aaMHsjfly4nkaqswhySVXQqr8Hw6DbWVw8jLLVKEE+5NZHY33hJkhJwK4blCllsGpmQaKi1qxjsN0hZOWNK01iJAydwD8t2xJ0NOYbq8Qas5IyPnRN7SPxvEhIP6WLQ6Ym6Dmf8FwNW1cHLTKabgjzt5f/HKUkKS89dPd3fn4nnFli1BOMECGUIvVlOw2pQNri7+04OOfn2FGlqr5 teacher
+      - ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQCq4MJxGWsQw+Dw2B+8RyBHlQ2ik1cqJHmHD9LJov/70JgFwIb/83fHZYSQzlAhR959ZdrB7A2wgjYs0eOKBFDsEdVVVlDng7lvaeGhPJ+mORWnXFhbabDPyA45qb3VKQyU0ZRREQhWGLbcri/IgbKEHnIHlmyIloOj5UaBHxx9Fi1yuMYMBUTsrJLGCja3nTD7/eo2iINHk0hpXiKauPGLVSG2HRlaxNBWhaApBENcxZ1KwVHHGd6TkD7agWVAMJXLEJQcv7mLp43caLs9RVjQbuR06uD7ClfM5Moy2nQm8OluEoFONNJ7kWfsKawbw1M/oThNkapKgoM6DiuIFnQr aws-key
+      - ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQC0WGP1EZykEtv5YGC9nMiPFW3U3DmZNzKFO5nEu6uozEHh4jLZzPNHSrfFTuQ2GnRDSt+XbOtTLdcj26+iPNiFoFha42aCIzYjt6V8Z+SQ9pzF4jPPzxwXfDdkEWylgoNnZ+4MG1lNFqa8aO7F62tX0Yj5khjC0Bs7Mb2cHLx1XZaxJV6qSaulDuBbLYe8QUZXkMc7wmob3PM0kflfolR3LE7LResIHWa4j4FL6r5cQmFlDU2BDPpKMFMGUfRSFiUtaWBNXFOWHQBC2+uKmuMPYP4vJC9sBgqMvPN/X2KyemqdMvdKXnCfrzadHuSSJYEzD64Cve5Zl9yVvY4AqyBD aws-key
+ssh_pwauth: false
+disable_root: false
+package_update: true
+package_upgrade: true
+groups:
+  - docker
+system_info:
+  default_user:
+    groups: [docker]
+packages:
+  - apt-transport-https
+  - ca-certificates
+  - curl
+  - gnupg
+  - lsb-release
+  - unattended-upgrades
+final_message: "The system is finally up, after $UPTIME seconds"
+write_files:
+  - path: /home/ubuntu/docker-compose.yml
+    content: |
+      version: '3.8'
+      services:
+        web:
+          build: .
+          container_name: m347-kn04a-web
+          ports:
+            - "80:80"
+          networks:
+            kn04net:
+              ipv4_address: 172.10.5.10
+        db:
+          image: mariadb:latest
+          container_name: m347-kn04a-db
+          environment:
+            MYSQL_ROOT_PASSWORD: rootpass
+            MYSQL_DATABASE: kn4a-db
+          networks:
+            kn04net:
+              ipv4_address: 172.10.5.11
+      networks:
+        kn04net:
+          ipam:
+            config:
+              - subnet: 172.10.0.0/16
+                ip_range: 172.10.5.0/24
+                gateway: 172.10.5.254
+  - path: /home/ubuntu/Dockerfile
+    content: |
+      FROM php:8.1-apache
+      RUN docker-php-ext-install mysqli
+      COPY . /var/www/html/
+      EXPOSE 80
+  - path: /home/ubuntu/db.php
+    content: |
+      <?php
+              //database
+              $servername = "m347-kn04a-db";
+              $username = "root";
+              $password = "rootpass";
+              $dbname = "kn4a-db";
+
+              // Create connection
+              $conn = new mysqli($servername, $username, $password, $dbname);
+              // Check connection
+              if ($conn->connect_error) {
+                      die("Connection failed: " . $conn->connect_error);
+              }
+
+              $sql = "select Host, User from mysql.user;";
+              $result = $conn->query($sql);
+              while($row = $result->fetch_assoc()){
+                      echo($row["Host"] . " / " . $row["User"] . "<br />");
+              }
+              //var_dump($result);
+      ?>
+  - path: /home/ubuntu/info.php
+    content: |
+      <?php
+      // Show all information, defaults to INFO_ALL
+      phpinfo();
+      ?>
+runcmd:
+  - mkdir -p /etc/apt/keyrings
+  - curl -fsSL https://download.docker.com/linux/ubuntu/gpg | gpg --dearmor -o /etc/apt/keyrings/docker.gpg
+  - echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" | tee /etc/apt/sources.list.d/docker.list > /dev/null
+  - apt-get update
+  - apt-get install -y docker-ce docker-ce-cli containerd.io docker-compose-plugin
+  - systemctl enable docker
+  - systemctl start docker
+  - cd /home/ubuntu
+  - docker compose up -d
