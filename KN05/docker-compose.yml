@@ -1,0 +1,24 @@
+version: '3.9'
+
+volumes:
+  named_volume:
+
+services:
+  nginx1:
+    image: nginx
+    container_name: nginx1
+    volumes:
+      - type: volume
+        source: named_volume
+        target: /data/volume
+      - type: bind
+        source: ./binddata
+        target: /data/bind
+      - type: tmpfs
+        target: /data/tmpfs
+
+  nginx2:
+    image: nginx
+    container_name: nginx2
+    volumes:
+      - named_volume:/data/volume
